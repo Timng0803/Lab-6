@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
+
+    <title>Polyline Simplification</title>
+
+    <!-- open street map leaflet-->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+
+    <!--javascript-->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct" crossorigin="anonymous"></script>
+
+    <!-- Adding jQuery -->
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
+    <!-- Adding Turf.js-->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.2.3/leaflet.draw.css" />
+    <script src="https://unpkg.com/leaflet@1.0.3/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.2.3/leaflet.draw.js"></script>
+    <script src='https://npmcdn.com/@turf/turf/turf.min.js'></script>
+
+    <style type="text/css">
+        #map{
+             height: 650px;
+        };
+    </style>
+
+  </head>
+
+  <body>
+    <div class="container" style = "font-family: 'Helvetica Neue', sans-serif">
+        <div class="row" style="background-color: black; color: white; padding: 1rem">
+            <div class="h3 col align-self-center">
+                Line Simplication
+            </div>
+        </div>
+    </div>
+    <div class="container text-center" style="font-family: 'Helvetica Neue', sans-serif">
+      <div class="row">
+        <div class="col align-self-center">
+          <form class="form-group" style="padding: 0.5rem">
+            <div class="input-group input-daterange" style="z-index: 100; margin-top: 10px;">
+              <button id="Simplify" class="btn btn-success btn-lg mx-2" type="button">
+                <i class="fas fa-magic me-2"></i>Simplify
+              </button>
+              <button id="Remove" class="btn btn-danger btn-lg mx-2" type="button">
+                <i class="fas fa-trash-alt me-2"></i>Remove
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+        
+    <div id="map" style="z-index: 1;"></div>
+
+    <script type="text/javascript">
+      // Set up the Leaflet map and add the Mapbox Streets tile layer to the map
+      var map = L.map('map').setView([51.032077, -114.052983], 13);
+      L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/{z}/{x}/{y}?access_token={accessToken}', {
+        attribution: '© <a href="https://apps.mapbox.com/feedback/">Mapbox</a> © <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 18,
+        tileSize: 512,
+        zoomOffset: -1,
+        accessToken: 'pk.eyJ1IjoibWlra29yYW1vcyIsImEiOiJja2o4MTJicmcwNGF5MzBwN3c2eGpiajJhIn0.6u3ND0vC40NLgZfQJOvO2A'
+      }).addTo(map);
+
+      // Define the options for the Leaflet Draw control
+      var options = {
+        position: 'topleft',
+        draw: {
+          polyline: {
+            shapeOptions: {
+                color: '#e31717',
+                weight: 4
+            }
+          },
+          polygon: false,
+          circle: false,
+          rectangle: false,
+          marker: false,
+          },
+        edit: false
+      };
+
+      // Create a Leaflet Draw control with the specified options and add it to the map
+      var drawControl = new L.Control.Draw(options);
+      map.addControl(drawControl);
+
+      // Create a FeatureGroup for drafted polylines and add it to the map
+      var Drafted_Polylines = new L.FeatureGroup();
+      map.addLayer(Drafted_Polylines);
+
+      // Create a GeoJSON layer for Simplified polylines and add it to the map
+      var Simplified_Polylines = new L.geoJSON().addTo(map);
+
+      // Initialize variables to hold the polyline and simplified version of it
+      var polyline, simplified;
+
+      // When a new feature is drawn, add it to the Drafted_Polylines FeatureGroup and store the GeoJSON representation of the polyline
+      map.on('draw:created', function(e) {
+        var type = e.layerType,
+        layer = e.layer;
+
+        polyline = e.layer.toGeoJSON();
+
+        Drafted_Polylines.addLayer(layer);
+      });
+
+      // When the "Simplify" button is clicked, simplify the polylines and add it to the Simplified_Polylines GeoJSON layers
+      document.getElementById('Simplify').addEventListener("click", function() {
+        simplified = turf.simplify(polyline, {tolerance: 0.01, highQuality: false});
+        console.log(simplified);
+        Simplified_Polylines.addData(simplified);
+      });
+
+      // When the "Remove" button is clicked, clear both the Drafted_Polylines and Simplified_Polylines GeoJSON layers
+      document.getElementById('Remove').addEventListener("click", function() {
+        Simplified_Polylines.clearLayers();
+        Drafted_Polylines.clearLayers();
+      });
+
+    </script>
+
+  </body>
+</html>
